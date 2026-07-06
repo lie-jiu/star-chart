@@ -12,8 +12,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from concurrent.futures import ThreadPoolExecutor
 
-from app.models.news import NewsCache
-from app.models.daily_news import DailyNewsCache
+from app.models import NewsCache, DailyNewsCache
 
 # 翻译线程池
 _executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="translator")

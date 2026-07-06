@@ -30,16 +30,18 @@
 - **自动翻译**：英文新闻实时翻译为中文
 - 5 大分类：国际/财经/科技/美股/加密货币
 
-### 🔐 安全
+### 🔐 安全与权限
 - **Argon2id** 慢哈希（PHC 冠军，OWASP 推荐）
 - JWT Token 认证，7 天有效期
 - 用户名纯英文 + 强密码策略
 - SQL 注入防护（SQLAlchemy 参数化查询）
-- HTTPS 安全头部（HSTS/CSP/X-Frame-Options）
+- **多用户隔离**：每个用户只能看到自己的数据
+- **管理员系统**：管理员可管理所有用户权限
 
-### 📱 响应式
+### 📱 响应式设计
 - 桌面端侧边栏导航
 - 移动端汉堡菜单 + 自适应布局
+- 手机端优化，无横向溢出
 
 ## 🛠️ 技术栈
 
@@ -80,9 +82,6 @@ cd backend
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-
-# 修改数据库连接
-export DATABASE_URL="postgresql://dashboard:your_password@127.0.0.1:5432/dashboard"
 ```
 
 ### 4. 前端构建
@@ -104,11 +103,29 @@ python create_admin.py <用户名> <密码>
 ### 6. 启动服务
 
 ```bash
+cd backend
 source venv/bin/activate
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
 访问 `http://localhost:8000`
+
+### 7. 使用 CLI 管理（可选）
+
+```bash
+# 安装 CLI
+sudo cp /usr/local/bin/dashboard /usr/local/bin/dashboard
+sudo chmod +x /usr/local/bin/dashboard
+
+# 使用命令
+dashboard start          # 启动服务
+dashboard stop           # 停止服务
+dashboard restart        # 重启服务
+dashboard status         # 查看状态
+dashboard logs           # 查看日志
+dashboard create-admin <用户名> <密码>  # 创建管理员
+dashboard backup         # 备份数据库
+```
 
 ## 📡 API 文档
 
@@ -118,17 +135,50 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 ### 主要端点
 
+**认证**
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | POST | `/api/auth/register` | 注册 |
 | POST | `/api/auth/login` | 登录 |
-| GET | `/api/auth/me` | 当前用户 |
+| GET | `/api/auth/me` | 当前用户信息 |
+| PATCH | `/api/auth/me` | 修改用户名 |
+| POST | `/api/auth/change-password` | 修改密码 |
+| DELETE | `/api/auth/me` | 注销当前账号 |
+
+**监控**
+| 方法 | 路径 | 说明 |
+|------|------|------|
 | GET | `/api/monitor/targets` | 监控目标列表 |
 | POST | `/api/monitor/targets` | 添加监控目标 |
+| PUT | `/api/monitor/targets/{id}` | 更新监控目标 |
+| DELETE | `/api/monitor/targets/{id}` | 删除监控目标 |
+| GET | `/api/monitor/logs/{id}` | 监控日志 |
+| GET | `/api/monitor/stats` | 监控统计 |
+
+**股票**
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/stocks/watchlist` | 关注列表 |
+| POST | `/api/stocks/watchlist` | 添加关注 |
+| DELETE | `/api/stocks/watchlist/{id}` | 移除关注 |
 | GET | `/api/stocks/quote/{symbol}` | 实时行情 |
 | GET | `/api/stocks/history/{symbol}` | 历史K线 |
+| GET | `/api/stocks/search` | 搜索股票 |
+
+**新闻**
+| 方法 | 路径 | 说明 |
+|------|------|------|
 | GET | `/api/news/` | 新闻列表 |
+| GET | `/api/news/categories` | 新闻分类 |
 | POST | `/api/news/refresh` | 手动刷新新闻 |
+
+**管理（仅管理员）**
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/auth/users` | 列出所有用户 |
+| POST | `/api/auth/set-admin/{id}` | 设置管理员 |
+| POST | `/api/auth/unset-admin/{id}` | 取消管理员 |
+| DELETE | `/api/auth/users/{id}` | 删除用户 |
 
 ## 🔧 部署
 
@@ -144,7 +194,6 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/root/dashboard/backend
-Environment=DATABASE_URL=postgresql://dashboard:password@127.0.0.1:5432/dashboard
 ExecStart=/root/dashboard/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
 Restart=always
 
@@ -182,6 +231,40 @@ server {
     }
 }
 ```
+
+### 使用 CloudFlare Tunnel
+
+```bash
+# 安装 cloudflared
+curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared
+chmod +x /usr/local/bin/cloudflared
+
+# 登录并创建隧道
+cloudflared tunnel login
+cloudflared tunnel create star-chart
+
+# 配置 ingress
+cat > ~/.cloudflared/config.yml << 'EOF'
+tunnel: <your-tunnel-id>
+credentials-file: ~/.cloudflared/<your-tunnel-id>.json
+
+ingress:
+  - hostname: dashboard.yourdomain.com
+    service: http://127.0.0.1:8000
+  - service: http_status:404
+EOF
+
+# 启动
+cloudflared tunnel run star-chart
+```
+
+## 🔒 安全建议
+
+1. **修改默认 SECRET_KEY**：编辑 `backend/app/auth.py` 中的 `SECRET_KEY`
+2. **使用强密码**：密码策略要求 8 位以上，含大小写字母、数字、特殊字符
+3. **启用 HTTPS**：生产环境务必使用 HTTPS（CloudFlare Tunnel 自带）
+4. **定期备份**：使用 `dashboard backup` 命令定期备份数据库
+5. **最小权限**：只给必要用户管理员权限
 
 ## 📄 许可证
 

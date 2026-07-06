@@ -7,7 +7,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
-from app.models.monitor import MonitorTarget, MonitorLog
+from app.models import MonitorTarget, MonitorLog
 
 
 class MonitorChecker:

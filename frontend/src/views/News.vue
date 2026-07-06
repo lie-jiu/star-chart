@@ -80,7 +80,7 @@ const refresh = async () => {
 
 const formatTime = (t) => {
   if (!t) return ''
-  const d = dayjs(t).add(8, 'hour')
+  const d = dayjs(t)
   const now = dayjs()
   if (now.diff(d, 'hour') < 1) return `${now.diff(d, 'minute')} 分钟前`
   if (now.diff(d, 'hour') < 24) return `${now.diff(d, 'hour')} 小时前`

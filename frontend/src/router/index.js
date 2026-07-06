@@ -4,6 +4,8 @@ import Monitor from '../views/Monitor.vue'
 import Stocks from '../views/Stocks.vue'
 import News from '../views/News.vue'
 import Login from '../views/Login.vue'
+import Account from '../views/Account.vue'
+import Admin from '../views/Admin.vue'
 
 const routes = [
   { path: '/login', name: 'login', component: Login, meta: { public: true } },
@@ -11,6 +13,8 @@ const routes = [
   { path: '/monitor', name: 'monitor', component: Monitor },
   { path: '/stocks', name: 'stocks', component: Stocks },
   { path: '/news', name: 'news', component: News },
+  { path: '/account', name: 'account', component: Account },
+  { path: '/admin', name: 'admin', component: Admin },
 ]
 
 const router = createRouter({

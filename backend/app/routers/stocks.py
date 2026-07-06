@@ -7,10 +7,9 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 from app.database import get_db
-from app.models.stocks import StockWatchlist, StockCache
+from app.models import StockWatchlist, StockCache, User
 from app.services.stock_service import StockService
 from app.routers.auth import get_current_user
-from app.models.user import User
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 
@@ -31,10 +30,12 @@ class WatchlistUpdate(BaseModel):
 
 
 @router.get("/watchlist")
-async def get_watchlist(db: Session = Depends(get_db)):
-    """获取关注列表"""
-    items = db.query(StockWatchlist).order_by(StockWatchlist.added_at.desc()).all()
-    # 附加实时行情
+async def get_watchlist(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """获取当前用户的关注列表"""
+    items = db.query(StockWatchlist).filter(
+        StockWatchlist.user_id == current_user.id
+    ).order_by(StockWatchlist.added_at.desc()).all()
+
     service = StockService()
     result = []
     for item in items:
@@ -52,14 +53,16 @@ async def get_watchlist(db: Session = Depends(get_db)):
 
 
 @router.post("/watchlist")
-async def add_to_watchlist(item: WatchlistCreate, db: Session = Depends(get_db)):
+async def add_to_watchlist(item: WatchlistCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """添加关注股票"""
     existing = db.query(StockWatchlist).filter(
+        StockWatchlist.user_id == current_user.id,
         StockWatchlist.symbol == item.symbol.upper()
     ).first()
     if existing:
         raise HTTPException(status_code=400, detail="Already in watchlist")
     db_item = StockWatchlist(
+        user_id=current_user.id,
         symbol=item.symbol.upper(),
         name=item.name,
         note=item.note,
@@ -73,9 +76,12 @@ async def add_to_watchlist(item: WatchlistCreate, db: Session = Depends(get_db))
 
 
 @router.delete("/watchlist/{item_id}")
-async def remove_from_watchlist(item_id: int, db: Session = Depends(get_db)):
+async def remove_from_watchlist(item_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """移除关注股票"""
-    item = db.query(StockWatchlist).filter(StockWatchlist.id == item_id).first()
+    item = db.query(StockWatchlist).filter(
+        StockWatchlist.id == item_id,
+        StockWatchlist.user_id == current_user.id
+    ).first()
     if not item:
         raise HTTPException(status_code=404, detail="Not found")
     db.delete(item)

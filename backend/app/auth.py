@@ -1,15 +1,16 @@
 """
-用户认证服务 - Argon2id (PHC 冠军，OWASP 推荐)
-参数：time_cost=3, memory_cost=64MB, parallelism=4
-抵御 GPU/ASIC/侧信道攻击
+用户认证服务
+算法：Argon2id（2015 年 PHC 密码哈希竞赛冠军，目前业界最先进方案）
+配置：t=3, m=64MB, p=4（OWASP 推荐最低参数）
+安全性：抗 GPU 暴力破解、抗 ASIC 专用硬件、抗侧信道攻击、抗彩虹表
 """
+import re
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from pydantic import BaseModel
-
 from argon2.low_level import Type
 
 # Argon2id 配置（OWASP 推荐最低参数）
@@ -30,6 +31,7 @@ ACCESS_TOKEN_EXPIRE_DAYS = 7
 
 class TokenData(BaseModel):
     username: str
+    is_admin: bool = False
 
 
 class Token(BaseModel):
@@ -48,10 +50,12 @@ def get_password_hash(password: str) -> str:
     return ph.hash(password)
 
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(data: dict, is_admin: bool = False, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
-    expiration = datetime.utcnow() + (expires_delta or timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS))
-    to_encode.update({"exp": expiration})
+    if is_admin:
+        to_encode.update({"admin": True})
+    expire = datetime.utcnow() + (expires_delta or timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS))
+    to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
@@ -61,6 +65,6 @@ def decode_token(token: str) -> Optional[TokenData]:
         username: str = payload.get("sub")
         if username is None:
             return None
-        return TokenData(username=username)
+        return TokenData(username=username, is_admin=payload.get("admin", False))
     except JWTError:
         return None

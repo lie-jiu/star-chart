@@ -8,7 +8,7 @@ from typing import Optional
 from app.database import get_db
 from app.services.news_service import NewsService
 from app.routers.auth import get_current_user
-from app.models.user import User
+from app.models import User
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 

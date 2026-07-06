@@ -13,8 +13,8 @@ Base = declarative_base()
 
 def init_db():
     """初始化数据库表"""
-    from app.models import monitor, stocks, news, user, daily_news  # noqa
-    Base.metadata.create_all(bind=engine)
+    from app.models import Base as ModelsBase
+    ModelsBase.metadata.create_all(bind=engine)
 
 
 def get_db():

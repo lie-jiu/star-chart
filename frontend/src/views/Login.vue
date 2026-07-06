@@ -5,6 +5,7 @@
         <span class="logo-icon">🗺️</span>
         <span class="logo-text">星图</span>
       </div>
+
       <h2>{{ isLogin ? '登录' : '注册' }}</h2>
 
       <form @submit.prevent="handleSubmit">
@@ -38,7 +39,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../api'
 
@@ -46,23 +47,6 @@ const router = useRouter()
 const isLogin = ref(true)
 const form = ref({ username: '', password: '', passwordConfirm: '' })
 const error = ref('')
-
-onMounted(async () => {
-  const token = localStorage.getItem('token')
-  if (token) {
-    api.defaults.headers.common['Authorization'] = `Bearer ${token}`
-    try {
-      const { data } = await api.get('/auth/check')
-      if (data.authenticated) {
-        router.push('/')
-        return
-      }
-    } catch (e) {
-      localStorage.removeItem('token')
-      delete api.defaults.headers.common['Authorization']
-    }
-  }
-})
 
 const handleSubmit = async () => {
   error.value = ''

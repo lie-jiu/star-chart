@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 os.chdir(Path(__file__).parent)
 
 from app.database import SessionLocal, init_db
-from app.models.user import User
+from app.models import User
 from app.auth import get_password_hash
 import re
 
@@ -65,7 +65,8 @@ def main():
 
         user = User(
             username=username,
-            password_hash=get_password_hash(password)
+            password_hash=get_password_hash(password),
+            is_admin=True
         )
         db.add(user)
         db.commit()

@@ -11,7 +11,7 @@
       </div>
       <nav class="nav">
         <router-link
-          v-for="item in navItems"
+          v-for="item in visibleNavItems"
           :key="item.path"
           :to="item.path"
           class="nav-item"
@@ -46,17 +46,27 @@ const router = useRouter()
 const route = useRoute()
 const isMobile = ref(false)
 const showMobileMenu = ref(false)
+const isAdmin = ref(false)
 
-const isLoggedIn = computed(() => {
-  return localStorage.getItem('token') !== null && route.name !== 'login'
-})
-
-const navItems = [
+const allNavItems = [
   { path: '/', name: '总览', icon: '📊' },
   { path: '/monitor', name: '服务监控', icon: '🖥️' },
   { path: '/stocks', name: '美股分析', icon: '📈' },
   { path: '/news', name: '全球新闻', icon: '🌍' },
+  { path: '/account', name: '账号管理', icon: '👤' },
+  { path: '/admin', name: '系统管理', icon: '⚙️', admin: true },
 ]
+
+const visibleNavItems = computed(() => {
+  return allNavItems.filter(item => !item.admin || isAdmin.value)
+})
+
+// 只要 token 存在且不在登录页，就认为已登录
+const isLoggedIn = computed(() => {
+  const token = localStorage.getItem('token')
+  const path = route.path
+  return token && path !== '/login'
+})
 
 const checkMobile = () => {
   isMobile.value = window.innerWidth <= 768
@@ -65,8 +75,18 @@ const checkMobile = () => {
   }
 }
 
+const checkAdmin = async () => {
+  try {
+    const { data } = await api.get('/auth/me')
+    isAdmin.value = data.is_admin || false
+  } catch (e) {
+    isAdmin.value = false
+  }
+}
+
 onMounted(() => {
   checkMobile()
+  checkAdmin()
   window.addEventListener('resize', checkMobile)
 })
 
@@ -86,6 +106,8 @@ const logout = () => {
 .layout {
   display: flex;
   min-height: 100vh;
+  overflow-x: hidden;
+  width: 100%;
 }
 
 .sidebar {
@@ -242,6 +264,9 @@ const logout = () => {
   .main-mobile {
     margin-left: 0;
     padding: 16px;
+    overflow-x: hidden;
+    width: 100%;
+    box-sizing: border-box;
   }
 }
 </style>

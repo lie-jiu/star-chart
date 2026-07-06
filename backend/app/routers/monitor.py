@@ -8,9 +8,8 @@ from datetime import datetime, timedelta
 from pydantic import BaseModel
 
 from app.database import get_db
-from app.models.monitor import MonitorTarget, MonitorLog
+from app.models import MonitorTarget, MonitorLog, User
 from app.routers.auth import get_current_user
-from app.models.user import User
 
 router = APIRouter(dependencies=[Depends(get_current_user)])
 
@@ -66,15 +65,15 @@ class LogResponse(BaseModel):
 # ============ Endpoints ============
 
 @router.get("/targets", response_model=List[TargetResponse])
-async def list_targets(db: Session = Depends(get_db)):
-    """获取所有监控目标"""
-    return db.query(MonitorTarget).order_by(MonitorTarget.id).all()
+async def list_targets(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """获取当前用户的所有监控目标"""
+    return db.query(MonitorTarget).filter(MonitorTarget.user_id == current_user.id).order_by(MonitorTarget.id).all()
 
 
 @router.post("/targets", response_model=TargetResponse)
-async def create_target(target: TargetCreate, db: Session = Depends(get_db)):
+async def create_target(target: TargetCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """添加监控目标"""
-    db_target = MonitorTarget(**target.model_dump())
+    db_target = MonitorTarget(**target.model_dump(), user_id=current_user.id)
     db.add(db_target)
     db.commit()
     db.refresh(db_target)
@@ -82,9 +81,12 @@ async def create_target(target: TargetCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/targets/{target_id}", response_model=TargetResponse)
-async def update_target(target_id: int, target: TargetUpdate, db: Session = Depends(get_db)):
+async def update_target(target_id: int, target: TargetUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """更新监控目标"""
-    db_target = db.query(MonitorTarget).filter(MonitorTarget.id == target_id).first()
+    db_target = db.query(MonitorTarget).filter(
+        MonitorTarget.id == target_id,
+        MonitorTarget.user_id == current_user.id
+    ).first()
     if not db_target:
         raise HTTPException(status_code=404, detail="Target not found")
     for key, value in target.model_dump(exclude_unset=True).items():
@@ -95,9 +97,12 @@ async def update_target(target_id: int, target: TargetUpdate, db: Session = Depe
 
 
 @router.delete("/targets/{target_id}")
-async def delete_target(target_id: int, db: Session = Depends(get_db)):
+async def delete_target(target_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """删除监控目标"""
-    db_target = db.query(MonitorTarget).filter(MonitorTarget.id == target_id).first()
+    db_target = db.query(MonitorTarget).filter(
+        MonitorTarget.id == target_id,
+        MonitorTarget.user_id == current_user.id
+    ).first()
     if not db_target:
         raise HTTPException(status_code=404, detail="Target not found")
     db.delete(db_target)
@@ -106,8 +111,16 @@ async def delete_target(target_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/logs/{target_id}", response_model=List[LogResponse])
-async def get_logs(target_id: int, hours: int = 24, db: Session = Depends(get_db)):
-    """获取监控日志"""
+async def get_logs(target_id: int, hours: int = 24, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """获取当前用户目标的监控日志"""
+    # 验证目标属于当前用户
+    target = db.query(MonitorTarget).filter(
+        MonitorTarget.id == target_id,
+        MonitorTarget.user_id == current_user.id
+    ).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Target not found")
+
     since = datetime.utcnow() - timedelta(hours=hours)
     logs = db.query(MonitorLog).filter(
         MonitorLog.target_id == target_id,
@@ -117,11 +130,11 @@ async def get_logs(target_id: int, hours: int = 24, db: Session = Depends(get_db
 
 
 @router.get("/stats")
-async def get_stats(db: Session = Depends(get_db)):
-    """获取监控统计"""
-    total = db.query(MonitorTarget).count()
-    up = db.query(MonitorTarget).filter(MonitorTarget.status == "up").count()
-    down = db.query(MonitorTarget).filter(MonitorTarget.status == "down").count()
+async def get_stats(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """获取当前用户的监控统计"""
+    total = db.query(MonitorTarget).filter(MonitorTarget.user_id == current_user.id).count()
+    up = db.query(MonitorTarget).filter(MonitorTarget.user_id == current_user.id, MonitorTarget.status == "up").count()
+    down = db.query(MonitorTarget).filter(MonitorTarget.user_id == current_user.id, MonitorTarget.status == "down").count()
     return {
         "total": total,
         "up": up,
